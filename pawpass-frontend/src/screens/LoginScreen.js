@@ -10,6 +10,7 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email || !password) return Alert.alert("Error", "Fill in all fields.");
+    
     setLoading(true);
     try {
       const res = await apiClient.post('/auth/login', { 
@@ -20,13 +21,17 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem('userToken', res.data.token);
       await AsyncStorage.setItem('userName', res.data.user.name);
       
-      // Redirect based on the role in your MongoDB
-      if (res.data.user.role === 'shop') {
-        navigation.replace('ShopDashboard');
+      const userEmail = email.trim().toLowerCase();
+      const userRole = res.data.user.role;
+
+      // Redirect Logic
+      if (userEmail === 'pawpassowner@gmail.com' || userRole === 'shop') {
+        navigation.replace('OwnerDashboard');
       } else {
         navigation.replace('MainApp');
       }
     } catch (err) {
+      console.log("Login Error:", err.response?.data || err.message);
       Alert.alert("Login Failed", err.response?.data?.msg || "Invalid Credentials");
     } finally { 
       setLoading(false); 
@@ -42,6 +47,7 @@ export default function LoginScreen({ navigation }) {
         value={email} 
         onChangeText={setEmail} 
         autoCapitalize="none" 
+        keyboardType="email-address"
       />
       <TextInput 
         style={styles.input} 
@@ -53,6 +59,7 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Login</Text>}
       </TouchableOpacity>
+      
       <TouchableOpacity onPress={() => navigation.navigate('Signup')} style={styles.link}>
         <Text>Need an account? <Text style={{color: '#4CAF50', fontWeight: 'bold'}}>Sign Up</Text></Text>
       </TouchableOpacity>
@@ -63,7 +70,7 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 25, backgroundColor: '#fff' },
   logo: { fontSize: 40, fontWeight: 'bold', textAlign: 'center', color: '#4CAF50', marginBottom: 50 },
-  input: { backgroundColor: '#F3F4F6', padding: 15, borderRadius: 12, marginBottom: 15 },
+  input: { backgroundColor: '#F3F4F6', padding: 15, borderRadius: 12, marginBottom: 15, borderWidth: 1, borderColor: '#eee' },
   btn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 12, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
   link: { marginTop: 25, alignSelf: 'center' }

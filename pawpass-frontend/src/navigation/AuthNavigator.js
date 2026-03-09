@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Screens
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -12,6 +13,7 @@ import MyBookingScreen from '../screens/MyBookingScreen';
 import ChatScreen from '../screens/ChatScreen';
 import AddPetScreen from '../screens/AddPetScreen';
 import PetListScreen from '../screens/PetListScreen';
+import OwnerDashboard from '../screens/OwnerDashboard'; // Added import
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -54,6 +56,18 @@ export default function AuthNavigator({ initialToken }) {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="MainApp" component={MainTabs} />
+      
+      {/* Registered the OwnerDashboard so navigation.replace('OwnerDashboard') works */}
+      <Stack.Screen 
+        name="OwnerDashboard" 
+        component={OwnerDashboard} 
+        options={{ 
+            headerShown: true, 
+            title: 'Admin Dashboard',
+            headerLeft: null // Prevents back swipe to login
+        }} 
+      />
+
       <Stack.Screen name="Booking" component={BookingScreen} options={{ headerShown: true }} />
       <Stack.Screen name="AddPet" component={AddPetScreen} options={{ headerShown: true }} />
       <Stack.Screen name="PetList" component={PetListScreen} options={{ headerShown: true }} />
