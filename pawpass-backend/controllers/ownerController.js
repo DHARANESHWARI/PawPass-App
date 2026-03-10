@@ -1,30 +1,58 @@
 const Booking = require('../models/Booking');
 
-exports.getAllBookings = async (req, res) => {
+exports.getOwnerDashboard = async (req, res) => {
     try {
-        const bookings = await Booking.find()
-            .populate('user', 'name email') 
-            // By NOT specifying fields, we fetch ALL fields (breed, age, vaccinationStatus, etc.)
-            .populate('pet') 
-            .sort({ createdAt: -1 });
+        const now = new Date();
+        const dateOptions = { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' };
+        let formattedToday = now.toLocaleDateString('en-US', dateOptions).replace(/,/g, '');
+        
+        // Use date from query (selected in calendar) or default to today
+        const searchDate = req.query.date || formattedToday;
 
-        res.json(bookings);
+        // 1. Fetch all bookings for that day
+        const dayBookings = await Booking.find({ date: searchDate })
+            .populate('user', 'name')
+            .populate('pet')
+            .sort({ time: 1 });
+
+        // 2. Filter QUEUE: Only 'Pending' status AND ONLY for the selected date
+        const queue = await Booking.find({ 
+            status: 'Pending', 
+            date: searchDate 
+        })
+        .populate('user', 'name')
+        .populate('pet')
+        .sort({ createdAt: 1 });
+
+        const stats = {
+            total: dayBookings.length,
+            pending: queue.length,
+            confirmed: dayBookings.filter(b => b.status === 'Confirmed').length,
+            inProcess: dayBookings.filter(b => b.status === 'In-Process').length,
+        };
+
+        res.json({ 
+            success: true, 
+            selectedDate: searchDate, 
+            stats, 
+            bookings: dayBookings, 
+            queue 
+        });
     } catch (err) {
-        console.error("Owner Fetch Error:", err.message);
-        res.status(500).json({ msg: "Server Error", error: err.message });
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 
 exports.updateBookingStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        const booking = await Booking.findByIdAndUpdate(
+        const updatedBooking = await Booking.findByIdAndUpdate(
             req.params.id,
             { status },
             { new: true }
-        );
-        res.json(booking);
+        ).populate('pet user');
+        res.json(updatedBooking);
     } catch (err) {
-        res.status(500).json({ msg: "Server Error" });
+        res.status(500).json({ success: false, message: "Update failed" });
     }
 };

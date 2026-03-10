@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/authMiddleware');
-const { getAllBookings } = require('../controllers/ownerController');
+const { getOwnerDashboard, updateBookingStatus } = require('../controllers/ownerController');
 
-// Ensure this path matches the Dashboard's request
-router.get('/bookings', auth, getAllBookings);
+// GET /api/owner/dashboard?date=...
+router.get('/dashboard', auth, getOwnerDashboard);
+
+// PATCH /api/owner/bookings/:id/status
+router.patch('/bookings/:id/status', auth, updateBookingStatus);
 
 module.exports = router;
