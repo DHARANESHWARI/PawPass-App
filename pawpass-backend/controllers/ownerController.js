@@ -2,41 +2,30 @@ const Booking = require('../models/Booking');
 
 exports.getOwnerDashboard = async (req, res) => {
     try {
-        const now = new Date();
-        const dateOptions = { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' };
-        let formattedToday = now.toLocaleDateString('en-US', dateOptions).replace(/,/g, '');
-        
-        // Use date from query (selected in calendar) or default to today
-        const searchDate = req.query.date || formattedToday;
+        const searchDate = req.query.date;
 
-        // 1. Fetch all bookings for that day
+        // Fetch all bookings for the day
         const dayBookings = await Booking.find({ date: searchDate })
             .populate('user', 'name')
             .populate('pet')
             .sort({ time: 1 });
 
-        // 2. Filter QUEUE: Only 'Pending' status AND ONLY for the selected date
-        const queue = await Booking.find({ 
-            status: 'Pending', 
-            date: searchDate 
-        })
-        .populate('user', 'name')
-        .populate('pet')
-        .sort({ createdAt: 1 });
-
+        // Calculate counts dynamically
+        // Ensure these keys match the Frontend statsRow exactly
         const stats = {
-            total: dayBookings.length,
-            pending: queue.length,
+            queue: dayBookings.filter(b => b.status === 'Pending').length,
             confirmed: dayBookings.filter(b => b.status === 'Confirmed').length,
-            inProcess: dayBookings.filter(b => b.status === 'In-Process').length,
+            active: dayBookings.filter(b => ['Checked-In', 'In-Process'].includes(b.status)).length,
+            completed: dayBookings.filter(b => b.status === 'Completed').length,
         };
+
+        // Debugging: Check your terminal to see if counts are > 0
+        console.log(`Stats for ${searchDate}:`, stats);
 
         res.json({ 
             success: true, 
-            selectedDate: searchDate, 
             stats, 
-            bookings: dayBookings, 
-            queue 
+            bookings: dayBookings 
         });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -51,8 +40,9 @@ exports.updateBookingStatus = async (req, res) => {
             { status },
             { new: true }
         ).populate('pet user');
-        res.json(updatedBooking);
+        
+        res.json({ success: true, booking: updatedBooking });
     } catch (err) {
-        res.status(500).json({ success: false, message: "Update failed" });
+        res.status(500).json({ success: false, message: "Status update failed" });
     }
 };
