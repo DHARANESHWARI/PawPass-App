@@ -20,6 +20,7 @@ exports.bookAppointment = async (req, res) => {
 
 exports.getMyBookings = async (req, res) => {
     try {
+        // Mongoose automatically includes rejectionReason since it's in the schema
         const bookings = await Booking.find({ user: req.user.id })
             .populate('pet')
             .sort({ createdAt: -1 });

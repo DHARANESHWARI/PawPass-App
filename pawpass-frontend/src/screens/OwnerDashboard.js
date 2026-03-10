@@ -30,36 +30,42 @@ const OwnerDashboard = ({ navigation }) => {
 
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
-  // LOGOUT LOGIC
   const handleLogout = () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Logout", 
-          style: "destructive",
-          onPress: async () => {
-            await AsyncStorage.removeItem('token');
-            await AsyncStorage.removeItem('user');
-            navigation.replace('Login'); // Returns user to Login screen
-          } 
-        }
-      ]
-    );
+    Alert.alert("Logout", "Are you sure?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Logout", style: "destructive", onPress: async () => {
+          await AsyncStorage.multiRemove(['token', 'user']);
+          navigation.replace('Login');
+      }}
+    ]);
   };
 
+  // CROSS-PLATFORM REJECTION LOGIC
   const handleStatusUpdate = async (id, newStatus) => {
+    if (newStatus === 'Cancelled') {
+      Alert.alert(
+        "Reject Appointment",
+        "Choose a reason to send to the user:",
+        [
+          { text: "Fully Booked", onPress: () => executeStatusUpdate(id, newStatus, "Sorry, we are fully booked for this time slot.") },
+          { text: "Staff Unavailable", onPress: () => executeStatusUpdate(id, newStatus, "Groomer is unavailable at this time.") },
+          { text: "Cancel", style: "cancel" }
+        ]
+      );
+    } else {
+      executeStatusUpdate(id, newStatus);
+    }
+  };
+
+  const executeStatusUpdate = async (id, status, reason = "") => {
     try {
-      await apiClient.patch(`/owner/bookings/${id}/status`, { status: newStatus });
+      await apiClient.patch(`/owner/bookings/${id}/status`, { status, reason });
       await fetchDashboard();
-      
-      if (newStatus === 'Confirmed') setActiveTab('Confirmed');
-      if (newStatus === 'Checked-In') setActiveTab('Active');
-      if (newStatus === 'Completed') setActiveTab('Done');
+      if (status === 'Confirmed') setActiveTab('Confirmed');
+      if (status === 'Checked-In') setActiveTab('Active');
+      if (status === 'Completed') setActiveTab('Done');
     } catch (err) {
-      Alert.alert("Error", "Could not update status.");
+      Alert.alert("Error", "Update failed.");
     }
   };
 
@@ -79,19 +85,11 @@ const OwnerDashboard = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* HEADER WITH LOGOUT */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.dateLabel}>{selectedDate}</Text>
-          <Text style={styles.title}>Admin Hub</Text>
-        </View>
+        <View><Text style={styles.dateLabel}>{selectedDate}</Text><Text style={styles.title}>Admin Hub</Text></View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowCalendar(!showCalendar)}>
-            <Text style={{fontSize: 20}}>📅</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, {marginLeft: 10, backgroundColor: '#FFEBEE'}]} onPress={handleLogout}>
-            <Text style={{fontSize: 20}}>🚪</Text> 
-          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowCalendar(!showCalendar)}><Text style={{fontSize: 20}}>📅</Text></TouchableOpacity>
+          <TouchableOpacity style={[styles.iconBtn, {marginLeft: 10, backgroundColor: '#FFEBEE'}]} onPress={handleLogout}><Text style={{fontSize: 20}}>🚪</Text></TouchableOpacity>
         </View>
       </View>
 
@@ -102,7 +100,6 @@ const OwnerDashboard = ({ navigation }) => {
       )}
 
       <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboard} />}>
-        {/* STATS GRID */}
         <View style={styles.statsRow}>
            <View style={styles.statBox}><Text style={styles.statNum}>{data?.stats?.queue || 0}</Text><Text style={styles.statLab}>QUEUE</Text></View>
            <View style={styles.statBox}><Text style={[styles.statNum, {color: '#4CAF50'}]}>{data?.stats?.confirmed || 0}</Text><Text style={styles.statLab}>CONFIRMED</Text></View>
@@ -118,34 +115,29 @@ const OwnerDashboard = ({ navigation }) => {
           ))}
         </View>
 
-        {getDisplayList().length === 0 ? (
-          <Text style={styles.emptyText}>No pets in this section</Text>
-        ) : (
-          getDisplayList().map(item => (
-            <View key={item._id} style={styles.card}>
-              <View style={styles.cardMain}>
-                <View>
-                  <Text style={styles.petName}>🐾 {item.pet?.name || 'Pet'}</Text>
-                  <Text style={styles.subText}>{item.service} • {item.time}</Text>
-                </View>
-                <View style={styles.badge}><Text style={styles.badgeText}>{item.status}</Text></View>
+        {getDisplayList().map(item => (
+          <View key={item._id} style={styles.card}>
+            <View style={styles.cardMain}>
+              <View>
+                <Text style={styles.petName}>🐾 {item.pet?.name || 'Pet'}</Text>
+                <Text style={styles.subText}>{item.service} • {item.time}</Text>
               </View>
-
-              <View style={styles.footer}>
-                {item.status === 'Pending' && (
-                  <View style={styles.row}>
-                    <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Confirmed')} style={[styles.actionBtn, {backgroundColor:'#4CAF50'}]}><Text style={styles.btnText}>Approve</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Cancelled')} style={[styles.actionBtn, {backgroundColor:'#F44336', marginLeft: 10}]}><Text style={styles.btnText}>Reject</Text></TouchableOpacity>
-                  </View>
-                )}
-                {item.status === 'Confirmed' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Checked-In')} style={[styles.actionBtn, {backgroundColor:'#9C27B0'}]}><Text style={styles.btnText}>Check-In Pet</Text></TouchableOpacity>}
-                {item.status === 'Checked-In' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'In-Process')} style={[styles.actionBtn, {backgroundColor:'#00BCD4'}]}><Text style={styles.btnText}>Start Service</Text></TouchableOpacity>}
-                {item.status === 'In-Process' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Completed')} style={[styles.actionBtn, {backgroundColor:'#4CAF50'}]}><Text style={styles.btnText}>Finish</Text></TouchableOpacity>}
-                {item.status === 'Completed' && <Text style={styles.doneText}>Completed successfully ✅</Text>}
-              </View>
+              <View style={styles.badge}><Text style={styles.badgeText}>{item.status}</Text></View>
             </View>
-          ))
-        )}
+            <View style={styles.footer}>
+              {item.status === 'Pending' && (
+                <View style={styles.row}>
+                  <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Confirmed')} style={[styles.actionBtn, {backgroundColor:'#4CAF50'}]}><Text style={styles.btnText}>Approve</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Cancelled')} style={[styles.actionBtn, {backgroundColor:'#F44336', marginLeft: 10}]}><Text style={styles.btnText}>Reject</Text></TouchableOpacity>
+                </View>
+              )}
+              {item.status === 'Confirmed' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Checked-In')} style={[styles.actionBtn, {backgroundColor:'#9C27B0'}]}><Text style={styles.btnText}>Check-In Pet</Text></TouchableOpacity>}
+              {item.status === 'Checked-In' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'In-Process')} style={[styles.actionBtn, {backgroundColor:'#00BCD4'}]}><Text style={styles.btnText}>Start Service</Text></TouchableOpacity>}
+              {item.status === 'In-Process' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Completed')} style={[styles.actionBtn, {backgroundColor:'#4CAF50'}]}><Text style={styles.btnText}>Finish</Text></TouchableOpacity>}
+              {item.status === 'Cancelled' && item.rejectionReason && <Text style={styles.reasonText}>Reason: {item.rejectionReason}</Text>}
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </View>
   );
@@ -177,8 +169,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
   actionBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  doneText: { textAlign: 'center', color: '#BDC3C7', fontStyle: 'italic' },
-  emptyText: { textAlign: 'center', color: '#AAA', marginTop: 40, fontSize: 16 }
+  reasonText: { color: '#F44336', fontSize: 12, fontStyle: 'italic', marginTop: 5 }
 });
 
 export default OwnerDashboard;

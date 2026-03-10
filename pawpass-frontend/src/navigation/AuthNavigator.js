@@ -13,7 +13,7 @@ import MyBookingScreen from '../screens/MyBookingScreen';
 import ChatScreen from '../screens/ChatScreen';
 import AddPetScreen from '../screens/AddPetScreen';
 import PetListScreen from '../screens/PetListScreen';
-import OwnerDashboard from '../screens/OwnerDashboard'; // Added import
+import OwnerDashboard from '../screens/OwnerDashboard';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -57,14 +57,13 @@ export default function AuthNavigator({ initialToken }) {
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="MainApp" component={MainTabs} />
       
-      {/* Registered the OwnerDashboard so navigation.replace('OwnerDashboard') works */}
       <Stack.Screen 
         name="OwnerDashboard" 
         component={OwnerDashboard} 
         options={{ 
             headerShown: true, 
             title: 'Admin Dashboard',
-            headerLeft: null // Prevents back swipe to login
+            headerLeft: null 
         }} 
       />
 

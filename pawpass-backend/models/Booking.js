@@ -6,7 +6,8 @@ const BookingSchema = new mongoose.Schema({
   service: { type: String, required: true },
   date: { type: String, required: true },
   time: { type: String, required: true },
-  status: { type: String, default: 'Confirmed' },
+  status: { type: String, default: 'Pending' },
+  rejectionReason: { type: String, default: '' }, // New field
   createdAt: { type: Date, default: Date.now }
 });
 
