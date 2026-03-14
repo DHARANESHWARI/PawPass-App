@@ -24,6 +24,7 @@ const MyBookingScreen = () => {
   const getStatusStyle = (status) => {
     switch(status) {
       case 'In-Process': return { color: '#2196F3', bg: '#E3F2FD' };
+      case 'Checked-In': return { color: '#FBC02D', bg: '#FFFDE7' }; // Added Yellow
       case 'Completed': 
       case 'Confirmed': return { color: '#4CAF50', bg: '#E8F5E9' };
       case 'Cancelled': return { color: '#F44336', bg: '#FFEBEE' };
@@ -45,9 +46,13 @@ const MyBookingScreen = () => {
           </View>
         </View>
 
+        {/* UPDATED: POLITE REJECTION BOX */}
         {item.status === 'Cancelled' && item.rejectionReason ? (
           <View style={styles.rejectionBox}>
-            <Text style={styles.rejectionTitle}>Note from Admin:</Text>
+            <View style={styles.rejectionHeader}>
+               <Text style={styles.rejectionIcon}>💌</Text>
+               <Text style={styles.rejectionTitle}>A message from our team:</Text>
+            </View>
             <Text style={styles.rejectionText}>"{item.rejectionReason}"</Text>
           </View>
         ) : null}
@@ -87,10 +92,23 @@ const styles = StyleSheet.create({
   petName: { fontSize: 18, fontWeight: 'bold', color: '#1A1A1A' },
   serviceText: { color: '#666', marginTop: 4, fontWeight: '500' },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 12, fontWeight: 'bold' },
-  rejectionBox: { backgroundColor: '#FFF5F5', padding: 12, borderRadius: 8, marginTop: 12, borderLeftWidth: 4, borderLeftColor: '#F44336' },
-  rejectionTitle: { fontSize: 12, fontWeight: 'bold', color: '#C62828', marginBottom: 2 },
-  rejectionText: { fontSize: 14, color: '#444', fontStyle: 'italic' },
+  statusText: { fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
+  
+  // UPDATED REJECTION STYLES
+  rejectionBox: { 
+    backgroundColor: '#FFF9F9', 
+    padding: 15, 
+    borderRadius: 12, 
+    marginTop: 12, 
+    borderWidth: 1,
+    borderColor: '#FFDADA',
+    borderStyle: 'dashed'
+  },
+  rejectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
+  rejectionIcon: { fontSize: 16, marginRight: 8 },
+  rejectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#D32F2F' },
+  rejectionText: { fontSize: 14, color: '#555', fontStyle: 'italic', lineHeight: 20 },
+  
   footer: { marginTop: 15, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 10 },
   dateText: { color: '#888', fontSize: 13, fontWeight: '500' },
   empty: { textAlign: 'center', marginTop: 50, color: '#999' }

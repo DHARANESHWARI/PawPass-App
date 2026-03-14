@@ -34,14 +34,7 @@ const OwnerDashboard = ({ navigation }) => {
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to exit the Admin panel?", [
       { text: "Cancel", style: "cancel" },
-      { 
-        text: "Logout", 
-        style: "destructive", 
-        onPress: async () => {
-          await AsyncStorage.clear(); 
-          navigation.replace('Login');
-        } 
-      }
+      { text: "Logout", style: "destructive", onPress: async () => { await AsyncStorage.clear(); navigation.replace('Login'); } }
     ]);
   };
 
@@ -56,11 +49,16 @@ const OwnerDashboard = ({ navigation }) => {
 
   const handleStatusUpdate = (id, newStatus) => {
     if (newStatus === 'Cancelled') {
-      Alert.alert("Reject", "Reason:", [
-        { text: "Full", onPress: () => executeStatusUpdate(id, newStatus, "Fully Booked") },
-        { text: "Staff Out", onPress: () => executeStatusUpdate(id, newStatus, "Staff Unavailable") },
-        { text: "Cancel", style: "cancel" }
-      ]);
+      Alert.alert(
+        "Decline Appointment",
+        "Select a polite reason for the pet parent:",
+        [
+          { text: "Slot Full", onPress: () => executeStatusUpdate(id, newStatus, "Our schedule is currently full for this time. We'd love to see your furry friend at another time!") },
+          { text: "Staff Out", onPress: () => executeStatusUpdate(id, newStatus, "Our specialist is unavailable today. We're so sorry for the inconvenience!") },
+          { text: "Emergency", onPress: () => executeStatusUpdate(id, newStatus, "A pet emergency has required our full attention. We appreciate your understanding and heart.") },
+          { text: "Cancel", style: "cancel" }
+        ]
+      );
     } else {
       executeStatusUpdate(id, newStatus);
     }
@@ -82,7 +80,6 @@ const OwnerDashboard = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* CUSTOM TOP TITLE BAR */}
       <View style={styles.titleBar}>
         <Text style={styles.adminTitle}>Admin</Text>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -92,7 +89,6 @@ const OwnerDashboard = ({ navigation }) => {
 
       <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboard} />}>
         
-        {/* DATE SELECTOR SECTION */}
         <View style={styles.dateSection}>
           <Text style={styles.headerLabel}>Admin Overview</Text>
           <TouchableOpacity onPress={() => setShowCalendar(!showCalendar)} style={styles.datePickerToggle}>
@@ -110,23 +106,12 @@ const OwnerDashboard = ({ navigation }) => {
           </View>
         )}
 
-        {/* QUICK STATS */}
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statVal}>{data?.stats?.queue || 0}</Text>
-            <Text style={styles.statLab}>PENDING</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statVal, {color: '#4CAF50'}]}>{data?.stats?.confirmed || 0}</Text>
-            <Text style={styles.statLab}>CONFIRMED</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statVal, {color: '#2196F3'}]}>{data?.stats?.active || 0}</Text>
-            <Text style={styles.statLab}>ONGOING</Text>
-          </View>
+          <View style={styles.statCard}><Text style={styles.statVal}>{data?.stats?.queue || 0}</Text><Text style={styles.statLab}>PENDING</Text></View>
+          <View style={styles.statCard}><Text style={[styles.statVal, {color: '#4CAF50'}]}>{data?.stats?.confirmed || 0}</Text><Text style={styles.statLab}>CONFIRMED</Text></View>
+          <View style={styles.statCard}><Text style={[styles.statVal, {color: '#2196F3'}]}>{data?.stats?.active || 0}</Text><Text style={styles.statLab}>ONGOING</Text></View>
         </View>
 
-        {/* TAB NAVIGATION */}
         <View style={styles.tabs}>
           {['Queue', 'Confirmed', 'Active', 'Done'].map(t => (
             <TouchableOpacity key={t} onPress={() => setActiveTab(t)} style={[styles.tabBtn, activeTab === t && styles.tabBtnActive]}>
@@ -135,16 +120,20 @@ const OwnerDashboard = ({ navigation }) => {
           ))}
         </View>
 
-        {/* BOOKING CARDS */}
         <View style={styles.listSection}>
           {getDisplayList().map(item => (
             <View key={item._id} style={styles.bookingCard}>
               <View style={styles.cardHeader}>
-                <View>
+                {/* LEFT SIDE: Information (Takes remaining space) */}
+                <View style={styles.infoWrapper}>
                   <Text style={styles.petName}>🐾 {item.pet?.name}</Text>
                   <Text style={styles.serviceText}>{item.service} • {item.time}</Text>
                 </View>
-                <View style={styles.statusBadge}><Text style={styles.statusText}>{item.status}</Text></View>
+                
+                {/* RIGHT SIDE: Status Badge (Fixed size, won't move) */}
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText} numberOfLines={1}>{item.status}</Text>
+                </View>
               </View>
 
               <View style={styles.cardFooter}>
@@ -154,7 +143,7 @@ const OwnerDashboard = ({ navigation }) => {
                     <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Cancelled')} style={[styles.actionBtn, {backgroundColor: '#FF5252', marginLeft: 10}]}><Text style={styles.btnTxt}>Reject</Text></TouchableOpacity>
                   </View>
                 )}
-                {item.status === 'Confirmed' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Checked-In')} style={[styles.actionBtn, {backgroundColor: '#9C27B0'}]}><Text style={styles.btnTxt}>Check-In</Text></TouchableOpacity>}
+                {item.status === 'Confirmed' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Checked-In')} style={[styles.actionBtn, {backgroundColor: '#FBC02D'}]}><Text style={styles.btnTxt}>Check-In</Text></TouchableOpacity>}
                 {item.status === 'Checked-In' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'In-Process')} style={[styles.actionBtn, {backgroundColor: '#00BCD4'}]}><Text style={styles.btnTxt}>Start Task</Text></TouchableOpacity>}
                 {item.status === 'In-Process' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Completed')} style={[styles.actionBtn, {backgroundColor: '#4CAF50'}]}><Text style={styles.btnTxt}>Complete</Text></TouchableOpacity>}
               </View>
@@ -169,43 +158,15 @@ const OwnerDashboard = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F7F8' },
-  // THE NEW TOP BAR
-  titleBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFF',
-  },
-  adminTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  logoutBtn: { 
-    backgroundColor: '#FFF0F0', 
-    paddingVertical: 8, 
-    paddingHorizontal: 16, 
-    borderRadius: 10, 
-    borderWidth: 1, 
-    borderColor: '#FFE0E0' 
-  },
+  titleBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#FFF' },
+  adminTitle: { fontSize: 24, fontWeight: 'bold', color: '#333' },
+  logoutBtn: { backgroundColor: '#FFF0F0', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: '#FFE0E0' },
   logoutText: { color: '#FF5252', fontWeight: 'bold', fontSize: 14 },
-  
-  // DATE SECTION
-  dateSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE'
-  },
+  dateSection: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#EEE' },
   headerLabel: { fontSize: 12, color: '#AAA', fontWeight: 'bold', textTransform: 'uppercase' },
   selectedDateText: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   datePickerToggle: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   chevron: { fontSize: 12, color: '#4CAF50' },
-  
   calendarPopout: { backgroundColor: '#FFF', margin: 10, borderRadius: 15, elevation: 5, overflow: 'hidden' },
   statsContainer: { flexDirection: 'row', justifyContent: 'space-between', padding: 20 },
   statCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 15, alignItems: 'center', elevation: 2 },
@@ -218,11 +179,35 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#4CAF50' },
   listSection: { paddingHorizontal: 20 },
   bookingCard: { backgroundColor: '#FFF', padding: 18, borderRadius: 18, marginBottom: 15, elevation: 3 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  
+  // ALIGNMENT FIXES HERE
+  cardHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-start' // Ensure badge stays at top even if text is long
+  },
+  infoWrapper: {
+    flex: 1, // This tells the text to take all space EXCEPT what the badge needs
+    marginRight: 12,
+  },
+  statusBadge: { 
+    backgroundColor: '#F0F9F4', 
+    paddingHorizontal: 10, 
+    paddingVertical: 5, 
+    borderRadius: 8,
+    minWidth: 85, // Fixed width for status
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
   petName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  serviceText: { color: '#777', fontSize: 14, marginTop: 4 },
-  statusBadge: { backgroundColor: '#F0F9F4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  serviceText: { 
+    color: '#777', 
+    fontSize: 14, 
+    marginTop: 4,
+    flexWrap: 'wrap', // Forces text to wrap to next line
+  },
   statusText: { color: '#4CAF50', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  
   cardFooter: { marginTop: 15, borderTopWidth: 1, borderTopColor: '#F5F5F5', paddingTop: 15 },
   buttonGroup: { flexDirection: 'row' },
   actionBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
