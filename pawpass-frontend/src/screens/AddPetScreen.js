@@ -8,8 +8,9 @@ export default function AddPetScreen({ navigation }) {
   const [age, setAge] = useState('');
   const [selectedSpecies, setSelectedSpecies] = useState('');
   const [selectedBreed, setSelectedBreed] = useState('');
-  
-  // New Fields
+  const [gender, setGender] = useState(''); // New Gender State
+
+  // Behavioral/Medical Fields
   const [vaccination, setVaccination] = useState('Up to date');
   const [allergies, setAllergies] = useState('None');
   const [afraidOf, setAfraidOf] = useState('None');
@@ -22,8 +23,9 @@ export default function AddPetScreen({ navigation }) {
   };
 
   const handleSave = async () => {
-    if (!name || !selectedSpecies || !selectedBreed || !age) {
-      return Alert.alert("Required Fields", "Please fill in basic details (Name, Species, Breed, Age).");
+    // Added gender to the validation check
+    if (!name || !selectedSpecies || !selectedBreed || !age || !gender) {
+      return Alert.alert("Required Fields", "Please fill in all basic details (Name, Species, Breed, Gender, Age).");
     }
 
     try {
@@ -31,6 +33,7 @@ export default function AddPetScreen({ navigation }) {
         name: name.trim(),
         species: selectedSpecies,
         breed: selectedBreed,
+        gender: gender, // Sending gender to backend
         age: parseInt(age),
         vaccinationStatus: vaccination,
         allergies: allergies,
@@ -71,13 +74,27 @@ export default function AddPetScreen({ navigation }) {
         </View>
       </View>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Breed</Text>
-        <View style={styles.pickerWrapper}>
-          <Picker selectedValue={selectedBreed} enabled={selectedSpecies !== ''} onValueChange={setSelectedBreed}>
-            <Picker.Item label="Select Breed..." value="" />
-            {selectedSpecies && speciesData[selectedSpecies].map(b => <Picker.Item key={b} label={b} value={b} />)}
-          </Picker>
+      {/* Row for Breed and Gender */}
+      <View style={styles.row}>
+        <View style={[styles.formGroup, { flex: 1, marginRight: 10 }]}>
+          <Text style={styles.label}>Breed</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker selectedValue={selectedBreed} enabled={selectedSpecies !== ''} onValueChange={setSelectedBreed}>
+              <Picker.Item label="Select..." value="" />
+              {selectedSpecies && speciesData[selectedSpecies].map(b => <Picker.Item key={b} label={b} value={b} />)}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={[styles.formGroup, { flex: 1 }]}>
+          <Text style={styles.label}>Gender</Text>
+          <View style={styles.pickerWrapper}>
+            <Picker selectedValue={gender} onValueChange={(val) => setGender(val)}>
+              <Picker.Item label="Select..." value="" />
+              <Picker.Item label="Male" value="Male" />
+              <Picker.Item label="Female" value="Female" />
+            </Picker>
+          </View>
         </View>
       </View>
 
@@ -94,7 +111,7 @@ export default function AddPetScreen({ navigation }) {
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Afraid of (e.g. Thunder, Vets)</Text>
+        <Text style={styles.label}>Afraid of (e.g. Thunder)</Text>
         <TextInput style={styles.input} value={afraidOf} onChangeText={setAfraidOf} />
       </View>
 
@@ -104,7 +121,7 @@ export default function AddPetScreen({ navigation }) {
           <Picker selectedValue={isFriendly} onValueChange={setIsFriendly}>
             <Picker.Item label="Yes" value="Yes" />
             <Picker.Item label="No" value="No" />
-            <Picker.Item label="With other pets only" value="Partially" />
+            <Picker.Item label="Partially" value="Partially" />
           </Picker>
         </View>
       </View>
@@ -124,8 +141,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
   label: { fontSize: 14, fontWeight: '600', marginBottom: 5, color: '#555' },
   input: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#DDD', padding: 12, borderRadius: 10 },
-  pickerWrapper: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#DDD', borderRadius: 10 },
+  pickerWrapper: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#DDD', borderRadius: 10, overflow: 'hidden' },
   saveBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 15 },
   saveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });
-

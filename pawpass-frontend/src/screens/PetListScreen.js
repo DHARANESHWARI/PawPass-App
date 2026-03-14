@@ -3,41 +3,44 @@ import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, 
   Modal, ScrollView, Alert, TextInput, RefreshControl 
 } from 'react-native';
-// Use this import to stop the terminal warnings
 import { SafeAreaView } from 'react-native-safe-area-context'; 
 import apiClient from '../api/client';
 
-export default function PetListScreen() {
+export default function PetListScreen({ route }) {
   const [pets, setPets] = useState([]);
   const [selectedPet, setSelectedPet] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 1. Define your impressive dropdown options
+  // Options matching AddPetScreen requirements
   const dropdownOptions = {
-    vaccinationStatus: ['Up to date', 'Pending', 'Not Vaccinated', 'Other'],
-    isFriendly: ['Very Friendly', 'Shy', 'Aggressive', 'Other'],
+    gender: ['Male', 'Female'],
+    vaccinationStatus: ['Up to date', 'Pending', 'Not Vaccinated'],
+    isFriendly: ['Yes', 'No', 'Partially'],
     allergies: ['None', 'Grain-free', 'Skin Allergies', 'Other'],
-    afraidOf: ['None', 'Thunder', 'Other Dogs', 'Other']
   };
 
   const fetchPets = async () => {
     try {
       const res = await apiClient.get('/pets');
       setPets(res.data);
+
+      const autoOpenId = route.params?.autoOpenId;
+      if (autoOpenId) {
+        const petToOpen = res.data.find(p => p._id === autoOpenId);
+        if (petToOpen) handleOpenDetails(petToOpen);
+      }
     } catch (err) {
       console.error("Error fetching pets:", err);
     }
   };
 
+  useEffect(() => { fetchPets(); }, [route.params?.autoOpenId]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchPets().then(() => setRefreshing(false));
-  }, []);
-
-  useEffect(() => {
-    fetchPets();
   }, []);
 
   const handleOpenDetails = (pet) => {
@@ -52,12 +55,12 @@ export default function PetListScreen() {
         age: parseInt(selectedPet.age) || 0 
       };
       await apiClient.put(`/pets/${selectedPet._id}`, updatedPetData);
-      Alert.alert("Success 🐾", "Pet details updated!");
+      Alert.alert("Success 🐾", "Pet updated!");
       setIsEditing(false);
       setIsModalVisible(false);
       fetchPets(); 
     } catch (err) {
-      Alert.alert("Update Failed", "The server couldn't save these changes.");
+      Alert.alert("Error", "Failed to save changes.");
     }
   };
 
@@ -65,12 +68,9 @@ export default function PetListScreen() {
     <View style={styles.petCard}>
       <View style={{ flex: 1 }}>
         <Text style={styles.petName}>{item.name}</Text>
-        <Text style={styles.petSub}>Age: {item.age}</Text>
+        <Text style={styles.petSub}>{item.species} • {item.breed} • {item.gender}</Text>
       </View>
-      <TouchableOpacity 
-        style={styles.detailsBtn} 
-        onPress={() => handleOpenDetails(item)}
-      >
+      <TouchableOpacity style={styles.detailsBtn} onPress={() => handleOpenDetails(item)}>
         <Text style={styles.detailsBtnText}>Details</Text>
       </TouchableOpacity>
     </View>
@@ -83,76 +83,53 @@ export default function PetListScreen() {
         keyExtractor={(item) => item._id}
         renderItem={renderPetItem}
         contentContainerStyle={{ padding: 20 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} color="#4CAF50" />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} color="#4CAF50" />}
       />
 
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <SafeAreaView style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>
-                {isEditing ? "Edit Pet Profile" : `${selectedPet?.name}'s Profile`}
-              </Text>
-
+              <Text style={styles.modalTitle}>{isEditing ? "Edit Pet Profile" : selectedPet?.name}</Text>
+              
               <DetailRow label="Name" value={selectedPet?.name} isEditing={isEditing} 
                 onChange={(val) => setSelectedPet({...selectedPet, name: val})} />
               
-              <DetailRow label="Age" value={String(selectedPet?.age || '')} isEditing={isEditing} keyboardType="numeric"
-                onChange={(val) => setSelectedPet({...selectedPet, age: val})} />
+              <View style={styles.row}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <DetailRow label="Age" value={String(selectedPet?.age || '')} isEditing={isEditing} keyboardType="numeric"
+                    onChange={(val) => setSelectedPet({...selectedPet, age: val})} />
+                </View>
+                <View style={{ flex: 1 }}>
+                   <DropdownRow label="Gender" value={selectedPet?.gender} isEditing={isEditing}
+                    options={dropdownOptions.gender} onSelect={(val) => setSelectedPet({...selectedPet, gender: val})} />
+                </View>
+              </View>
 
-              {/* Advanced Dropdown Rows */}
-              <DropdownRow 
-                label="Vaccination" 
-                field="vaccinationStatus" 
-                value={selectedPet?.vaccinationStatus} 
-                isEditing={isEditing}
-                options={dropdownOptions.vaccinationStatus}
-                onSelect={(val) => setSelectedPet({...selectedPet, vaccinationStatus: val})} 
-              />
+              <DetailRow label="Breed" value={selectedPet?.breed} isEditing={isEditing} 
+                onChange={(val) => setSelectedPet({...selectedPet, breed: val})} />
 
-              <DropdownRow 
-                label="Allergies" 
-                field="allergies" 
-                value={selectedPet?.allergies} 
-                isEditing={isEditing}
-                options={dropdownOptions.allergies}
-                onSelect={(val) => setSelectedPet({...selectedPet, allergies: val})} 
-              />
+              <Text style={styles.sectionHeader}>Medical & Behavior</Text>
 
-              <DropdownRow 
-                label="Afraid of" 
-                field="afraidOf" 
-                value={selectedPet?.afraidOf} 
-                isEditing={isEditing}
-                options={dropdownOptions.afraidOf}
-                onSelect={(val) => setSelectedPet({...selectedPet, afraidOf: val})} 
-              />
+              <DropdownRow label="Vaccination" value={selectedPet?.vaccinationStatus} isEditing={isEditing}
+                options={dropdownOptions.vaccinationStatus} onSelect={(val) => setSelectedPet({...selectedPet, vaccinationStatus: val})} />
 
-              <DropdownRow 
-                label="Friendly?" 
-                field="isFriendly" 
-                value={selectedPet?.isFriendly} 
-                isEditing={isEditing}
-                options={dropdownOptions.isFriendly}
-                onSelect={(val) => setSelectedPet({...selectedPet, isFriendly: val})} 
-              />
+              <DetailRow label="Allergies" value={selectedPet?.allergies} isEditing={isEditing} 
+                onChange={(val) => setSelectedPet({...selectedPet, allergies: val})} />
+
+              <DetailRow label="Afraid of" value={selectedPet?.afraidOf} isEditing={isEditing} 
+                onChange={(val) => setSelectedPet({...selectedPet, afraidOf: val})} />
+
+              <DropdownRow label="Friendly Status" value={selectedPet?.isFriendly} isEditing={isEditing}
+                options={dropdownOptions.isFriendly} onSelect={(val) => setSelectedPet({...selectedPet, isFriendly: val})} />
 
               <View style={styles.modalButtons}>
                 {isEditing ? (
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
-                    <Text style={styles.btnText}>Save Changes</Text>
-                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}><Text style={styles.btnText}>Save Changes</Text></TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(true)}>
-                    <Text style={styles.btnText}>Edit Profile</Text>
-                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(true)}><Text style={styles.btnText}>Edit Profile</Text></TouchableOpacity>
                 )}
-                <TouchableOpacity 
-                  style={styles.closeBtn} 
-                  onPress={() => { setIsModalVisible(false); setIsEditing(false); }}
-                >
+                <TouchableOpacity style={styles.closeBtn} onPress={() => { setIsModalVisible(false); setIsEditing(false); }}>
                   <Text style={styles.closeBtnText}>Close</Text>
                 </TouchableOpacity>
               </View>
@@ -164,83 +141,53 @@ export default function PetListScreen() {
   );
 }
 
-// 2. The New Impressive Dropdown Component
-const DropdownRow = ({ label, value, options, isEditing, onSelect }) => {
-  const isStandard = options.includes(value);
-  const showOtherInput = value === 'Other' || (!isStandard && value !== '' && value != null);
-
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      {isEditing ? (
-        <View>
-          <View style={styles.chipContainer}>
-            {options.map((opt) => (
-              <TouchableOpacity 
-                key={opt} 
-                style={[styles.chip, (value === opt || (opt === 'Other' && !isStandard)) && styles.chipActive]}
-                onPress={() => onSelect(opt === 'Other' ? 'Other' : opt)}
-              >
-                <Text style={[styles.chipText, (value === opt || (opt === 'Other' && !isStandard)) && styles.chipTextActive]}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {showOtherInput && (
-            <TextInput 
-              style={styles.detailInput}
-              placeholder="Please specify..."
-              value={value === 'Other' ? '' : value}
-              onChangeText={onSelect}
-              autoFocus={value === 'Other'}
-            />
-          )}
-        </View>
-      ) : (
-        <Text style={styles.detailValue}>{value || 'Not provided'}</Text>
-      )}
-    </View>
-  );
-};
+const DropdownRow = ({ label, value, options, isEditing, onSelect }) => (
+  <View style={styles.detailRow}>
+    <Text style={styles.detailLabel}>{label}</Text>
+    {isEditing ? (
+      <View style={styles.chipContainer}>
+        {options.map((opt) => (
+          <TouchableOpacity key={opt} style={[styles.chip, value === opt && styles.chipActive]} onPress={() => onSelect(opt)}>
+            <Text style={[styles.chipText, value === opt && styles.chipTextActive]}>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ) : <Text style={styles.detailValue}>{value || 'Not provided'}</Text>}
+  </View>
+);
 
 const DetailRow = ({ label, value, isEditing, onChange, keyboardType = "default" }) => (
   <View style={styles.detailRow}>
     <Text style={styles.detailLabel}>{label}</Text>
-    {isEditing ? (
-      <TextInput 
-        style={styles.detailInput} 
-        value={value} 
-        onChangeText={onChange} 
-        keyboardType={keyboardType}
-      />
-    ) : (
-      <Text style={styles.detailValue}>{value || 'Not provided'}</Text>
-    )}
+    {isEditing ? <TextInput style={styles.detailInput} value={value} onChangeText={onChange} keyboardType={keyboardType}/> : <Text style={styles.detailValue}>{value || 'Not provided'}</Text>}
   </View>
 );
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
-  petCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, elevation: 3 },
+  petCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 15, elevation: 3 },
   petName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   petSub: { color: '#777', marginTop: 4 },
   detailsBtn: { backgroundColor: '#4CAF50', paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8 },
   detailsBtnText: { color: '#fff', fontWeight: 'bold' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, maxHeight: '90%' },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#4CAF50', marginBottom: 20, textAlign: 'center' },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#4CAF50', textAlign: 'center', marginBottom: 20 },
+  sectionHeader: { fontSize: 16, fontWeight: 'bold', color: '#444', marginTop: 10, marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 5 },
   detailRow: { marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', paddingBottom: 10 },
-  detailLabel: { fontSize: 13, color: '#888', fontWeight: '600', marginBottom: 5 },
-  detailValue: { fontSize: 16, color: '#333', marginTop: 4, fontWeight: '500' },
-  detailInput: { backgroundColor: '#F9FAFB', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#DDD', color: '#333' },
+  detailLabel: { fontSize: 12, color: '#888', fontWeight: 'bold' },
+  detailValue: { fontSize: 16, marginTop: 4, color: '#333' },
+  detailInput: { backgroundColor: '#f9f9f9', padding: 10, borderRadius: 8, marginTop: 5, borderWidth: 1, borderColor: '#ddd', color: '#333' },
+  row: { flexDirection: 'row' },
   chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: '#EEE' },
-  chipActive: { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#4CAF50' },
+  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, backgroundColor: '#eee' },
+  chipActive: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50', borderWidth: 1 },
   chipText: { fontSize: 12, color: '#666' },
   chipTextActive: { color: '#4CAF50', fontWeight: 'bold' },
   modalButtons: { marginTop: 10 },
-  editBtn: { backgroundColor: '#2196F3', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 10 },
   saveBtn: { backgroundColor: '#4CAF50', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 10 },
-  closeBtn: { padding: 15, alignItems: 'center' },
+  editBtn: { backgroundColor: '#2196F3', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 10 },
+  closeBtn: { padding: 10, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   closeBtnText: { color: '#FF5252', fontWeight: 'bold', fontSize: 16 }
 });

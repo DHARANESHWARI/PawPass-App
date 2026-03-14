@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, ScrollView, Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -31,41 +32,37 @@ const OwnerDashboard = ({ navigation }) => {
   useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure?", [
+    Alert.alert("Logout", "Are you sure you want to exit the Admin panel?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive", onPress: async () => {
-          await AsyncStorage.multiRemove(['token', 'user']);
+      { 
+        text: "Logout", 
+        style: "destructive", 
+        onPress: async () => {
+          await AsyncStorage.clear(); 
           navigation.replace('Login');
-      }}
+        } 
+      }
     ]);
-  };
-
-  // CROSS-PLATFORM REJECTION LOGIC
-  const handleStatusUpdate = async (id, newStatus) => {
-    if (newStatus === 'Cancelled') {
-      Alert.alert(
-        "Reject Appointment",
-        "Choose a reason to send to the user:",
-        [
-          { text: "Fully Booked", onPress: () => executeStatusUpdate(id, newStatus, "Sorry, we are fully booked for this time slot.") },
-          { text: "Staff Unavailable", onPress: () => executeStatusUpdate(id, newStatus, "Groomer is unavailable at this time.") },
-          { text: "Cancel", style: "cancel" }
-        ]
-      );
-    } else {
-      executeStatusUpdate(id, newStatus);
-    }
   };
 
   const executeStatusUpdate = async (id, status, reason = "") => {
     try {
       await apiClient.patch(`/owner/bookings/${id}/status`, { status, reason });
       await fetchDashboard();
-      if (status === 'Confirmed') setActiveTab('Confirmed');
-      if (status === 'Checked-In') setActiveTab('Active');
-      if (status === 'Completed') setActiveTab('Done');
     } catch (err) {
       Alert.alert("Error", "Update failed.");
+    }
+  };
+
+  const handleStatusUpdate = (id, newStatus) => {
+    if (newStatus === 'Cancelled') {
+      Alert.alert("Reject", "Reason:", [
+        { text: "Full", onPress: () => executeStatusUpdate(id, newStatus, "Fully Booked") },
+        { text: "Staff Out", onPress: () => executeStatusUpdate(id, newStatus, "Staff Unavailable") },
+        { text: "Cancel", style: "cancel" }
+      ]);
+    } else {
+      executeStatusUpdate(id, newStatus);
     }
   };
 
@@ -81,95 +78,155 @@ const OwnerDashboard = ({ navigation }) => {
     }
   };
 
-  if (loading && !data) return <ActivityIndicator size="large" style={{flex:1, marginTop: 100}} color="#4CAF50" />;
+  if (loading && !data) return <ActivityIndicator size="large" style={{flex:1}} color="#4CAF50" />;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View><Text style={styles.dateLabel}>{selectedDate}</Text><Text style={styles.title}>Admin Hub</Text></View>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowCalendar(!showCalendar)}><Text style={{fontSize: 20}}>📅</Text></TouchableOpacity>
-          <TouchableOpacity style={[styles.iconBtn, {marginLeft: 10, backgroundColor: '#FFEBEE'}]} onPress={handleLogout}><Text style={{fontSize: 20}}>🚪</Text></TouchableOpacity>
-        </View>
+    <SafeAreaView style={styles.container}>
+      {/* CUSTOM TOP TITLE BAR */}
+      <View style={styles.titleBar}>
+        <Text style={styles.adminTitle}>Admin</Text>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
 
-      {showCalendar && (
-        <View style={styles.calCard}>
-          <Calendar onDayPress={(day) => { setSelectedDate(formatDBDate(new Date(day.dateString))); setShowCalendar(false); }} />
-        </View>
-      )}
-
-      <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboard} />}>
-        <View style={styles.statsRow}>
-           <View style={styles.statBox}><Text style={styles.statNum}>{data?.stats?.queue || 0}</Text><Text style={styles.statLab}>QUEUE</Text></View>
-           <View style={styles.statBox}><Text style={[styles.statNum, {color: '#4CAF50'}]}>{data?.stats?.confirmed || 0}</Text><Text style={styles.statLab}>CONFIRMED</Text></View>
-           <View style={styles.statBox}><Text style={[styles.statNum, {color: '#2196F3'}]}>{data?.stats?.active || 0}</Text><Text style={styles.statLab}>ACTIVE</Text></View>
-           <View style={styles.statBox}><Text style={[styles.statNum, {color: '#9E9E9E'}]}>{data?.stats?.completed || 0}</Text><Text style={styles.statLab}>DONE</Text></View>
+      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboard} />}>
+        
+        {/* DATE SELECTOR SECTION */}
+        <View style={styles.dateSection}>
+          <Text style={styles.headerLabel}>Admin Overview</Text>
+          <TouchableOpacity onPress={() => setShowCalendar(!showCalendar)} style={styles.datePickerToggle}>
+            <Text style={styles.selectedDateText}>{selectedDate}</Text>
+            <Text style={styles.chevron}> ▼</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.tabContainer}>
+        {showCalendar && (
+          <View style={styles.calendarPopout}>
+            <Calendar 
+              onDayPress={(day) => { setSelectedDate(formatDBDate(new Date(day.dateString))); setShowCalendar(false); }} 
+              theme={{ selectedDayBackgroundColor: '#4CAF50', todayTextColor: '#4CAF50' }}
+            />
+          </View>
+        )}
+
+        {/* QUICK STATS */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Text style={styles.statVal}>{data?.stats?.queue || 0}</Text>
+            <Text style={styles.statLab}>PENDING</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statVal, {color: '#4CAF50'}]}>{data?.stats?.confirmed || 0}</Text>
+            <Text style={styles.statLab}>CONFIRMED</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={[styles.statVal, {color: '#2196F3'}]}>{data?.stats?.active || 0}</Text>
+            <Text style={styles.statLab}>ONGOING</Text>
+          </View>
+        </View>
+
+        {/* TAB NAVIGATION */}
+        <View style={styles.tabs}>
           {['Queue', 'Confirmed', 'Active', 'Done'].map(t => (
-            <TouchableOpacity key={t} onPress={() => setActiveTab(t)} style={[styles.tab, activeTab === t && styles.activeTab]}>
-              <Text style={[styles.tabText, activeTab === t && {color:'#4CAF50'}]}>{t}</Text>
+            <TouchableOpacity key={t} onPress={() => setActiveTab(t)} style={[styles.tabBtn, activeTab === t && styles.tabBtnActive]}>
+              <Text style={[styles.tabText, activeTab === t && styles.tabTextActive]}>{t}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {getDisplayList().map(item => (
-          <View key={item._id} style={styles.card}>
-            <View style={styles.cardMain}>
-              <View>
-                <Text style={styles.petName}>🐾 {item.pet?.name || 'Pet'}</Text>
-                <Text style={styles.subText}>{item.service} • {item.time}</Text>
-              </View>
-              <View style={styles.badge}><Text style={styles.badgeText}>{item.status}</Text></View>
-            </View>
-            <View style={styles.footer}>
-              {item.status === 'Pending' && (
-                <View style={styles.row}>
-                  <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Confirmed')} style={[styles.actionBtn, {backgroundColor:'#4CAF50'}]}><Text style={styles.btnText}>Approve</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Cancelled')} style={[styles.actionBtn, {backgroundColor:'#F44336', marginLeft: 10}]}><Text style={styles.btnText}>Reject</Text></TouchableOpacity>
+        {/* BOOKING CARDS */}
+        <View style={styles.listSection}>
+          {getDisplayList().map(item => (
+            <View key={item._id} style={styles.bookingCard}>
+              <View style={styles.cardHeader}>
+                <View>
+                  <Text style={styles.petName}>🐾 {item.pet?.name}</Text>
+                  <Text style={styles.serviceText}>{item.service} • {item.time}</Text>
                 </View>
-              )}
-              {item.status === 'Confirmed' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Checked-In')} style={[styles.actionBtn, {backgroundColor:'#9C27B0'}]}><Text style={styles.btnText}>Check-In Pet</Text></TouchableOpacity>}
-              {item.status === 'Checked-In' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'In-Process')} style={[styles.actionBtn, {backgroundColor:'#00BCD4'}]}><Text style={styles.btnText}>Start Service</Text></TouchableOpacity>}
-              {item.status === 'In-Process' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Completed')} style={[styles.actionBtn, {backgroundColor:'#4CAF50'}]}><Text style={styles.btnText}>Finish</Text></TouchableOpacity>}
-              {item.status === 'Cancelled' && item.rejectionReason && <Text style={styles.reasonText}>Reason: {item.rejectionReason}</Text>}
+                <View style={styles.statusBadge}><Text style={styles.statusText}>{item.status}</Text></View>
+              </View>
+
+              <View style={styles.cardFooter}>
+                {item.status === 'Pending' && (
+                  <View style={styles.buttonGroup}>
+                    <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Confirmed')} style={[styles.actionBtn, {backgroundColor: '#4CAF50'}]}><Text style={styles.btnTxt}>Approve</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Cancelled')} style={[styles.actionBtn, {backgroundColor: '#FF5252', marginLeft: 10}]}><Text style={styles.btnTxt}>Reject</Text></TouchableOpacity>
+                  </View>
+                )}
+                {item.status === 'Confirmed' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Checked-In')} style={[styles.actionBtn, {backgroundColor: '#9C27B0'}]}><Text style={styles.btnTxt}>Check-In</Text></TouchableOpacity>}
+                {item.status === 'Checked-In' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'In-Process')} style={[styles.actionBtn, {backgroundColor: '#00BCD4'}]}><Text style={styles.btnTxt}>Start Task</Text></TouchableOpacity>}
+                {item.status === 'In-Process' && <TouchableOpacity onPress={() => handleStatusUpdate(item._id, 'Completed')} style={[styles.actionBtn, {backgroundColor: '#4CAF50'}]}><Text style={styles.btnTxt}>Complete</Text></TouchableOpacity>}
+              </View>
             </View>
-          </View>
-        ))}
+          ))}
+        </View>
+        <View style={{height: 100}} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FB', padding: 20, paddingTop: 50 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  headerIcons: { flexDirection: 'row', alignItems: 'center' },
-  dateLabel: { color: '#888', fontSize: 12, fontWeight: '600' },
-  title: { fontSize: 28, fontWeight: '800', color: '#1A1A1A' },
-  iconBtn: { backgroundColor: '#FFF', padding: 12, borderRadius: 15, elevation: 4 },
-  calCard: { backgroundColor: '#FFF', borderRadius: 20, overflow: 'hidden', marginBottom: 20, elevation: 8 },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  statBox: { width: '23%', backgroundColor: '#FFF', padding: 12, borderRadius: 16, elevation: 2, alignItems: 'center' },
-  statNum: { fontSize: 20, fontWeight: 'bold', color: '#F39C12' },
-  statLab: { fontSize: 8, color: '#BBB', fontWeight: 'bold', marginTop: 2 },
-  tabContainer: { flexDirection: 'row', backgroundColor: '#E0E4E8', borderRadius: 15, padding: 5, marginBottom: 20 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  activeTab: { backgroundColor: '#FFF', borderRadius: 12, elevation: 2 },
-  tabText: { fontWeight: 'bold', color: '#999', fontSize: 12 },
-  card: { backgroundColor: '#FFF', padding: 18, borderRadius: 20, marginBottom: 15, elevation: 3 },
-  cardMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  petName: { fontSize: 18, fontWeight: 'bold', color: '#2C3E50' },
-  subText: { color: '#7F8C8D', marginTop: 4, fontSize: 14 },
-  badge: { backgroundColor: '#F4F7F6', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 10, color: '#27AE60', fontWeight: 'bold' },
-  footer: { marginTop: 15, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 15 },
-  row: { flexDirection: 'row' },
-  actionBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  btnText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  reasonText: { color: '#F44336', fontSize: 12, fontStyle: 'italic', marginTop: 5 }
+  container: { flex: 1, backgroundColor: '#F4F7F8' },
+  // THE NEW TOP BAR
+  titleBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#FFF',
+  },
+  adminTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  logoutBtn: { 
+    backgroundColor: '#FFF0F0', 
+    paddingVertical: 8, 
+    paddingHorizontal: 16, 
+    borderRadius: 10, 
+    borderWidth: 1, 
+    borderColor: '#FFE0E0' 
+  },
+  logoutText: { color: '#FF5252', fontWeight: 'bold', fontSize: 14 },
+  
+  // DATE SECTION
+  dateSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE'
+  },
+  headerLabel: { fontSize: 12, color: '#AAA', fontWeight: 'bold', textTransform: 'uppercase' },
+  selectedDateText: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  datePickerToggle: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  chevron: { fontSize: 12, color: '#4CAF50' },
+  
+  calendarPopout: { backgroundColor: '#FFF', margin: 10, borderRadius: 15, elevation: 5, overflow: 'hidden' },
+  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', padding: 20 },
+  statCard: { backgroundColor: '#FFF', width: '31%', padding: 15, borderRadius: 15, alignItems: 'center', elevation: 2 },
+  statVal: { fontSize: 20, fontWeight: 'bold', color: '#F39C12' },
+  statLab: { fontSize: 9, color: '#999', marginTop: 4, fontWeight: 'bold' },
+  tabs: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 15 },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#DDD' },
+  tabBtnActive: { borderBottomColor: '#4CAF50' },
+  tabText: { color: '#AAA', fontWeight: 'bold', fontSize: 13 },
+  tabTextActive: { color: '#4CAF50' },
+  listSection: { paddingHorizontal: 20 },
+  bookingCard: { backgroundColor: '#FFF', padding: 18, borderRadius: 18, marginBottom: 15, elevation: 3 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  petName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  serviceText: { color: '#777', fontSize: 14, marginTop: 4 },
+  statusBadge: { backgroundColor: '#F0F9F4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusText: { color: '#4CAF50', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+  cardFooter: { marginTop: 15, borderTopWidth: 1, borderTopColor: '#F5F5F5', paddingTop: 15 },
+  buttonGroup: { flexDirection: 'row' },
+  actionBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  btnTxt: { color: '#FFF', fontWeight: 'bold' }
 });
 
 export default OwnerDashboard;

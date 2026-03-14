@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Screens
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -22,13 +21,7 @@ const MainTabs = ({ navigation }) => {
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure?", [
       { text: "Cancel" },
-      { 
-        text: "Logout", 
-        onPress: async () => { 
-          await AsyncStorage.clear(); 
-          navigation.replace('Login'); 
-        } 
-      }
+      { text: "Logout", onPress: async () => { await AsyncStorage.clear(); navigation.replace('Login'); } }
     ]);
   };
 
@@ -49,27 +42,21 @@ const MainTabs = ({ navigation }) => {
 
 export default function AuthNavigator({ initialToken }) {
   return (
-    <Stack.Navigator 
-      initialRouteName={initialToken ? "MainApp" : "Login"}
-      screenOptions={{ headerShown: false }}
-    >
+    <Stack.Navigator initialRouteName={initialToken ? "MainApp" : "Login"} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="MainApp" component={MainTabs} />
       
+      {/* UPDATED: headerShown set to false so we can use our custom top bar */}
       <Stack.Screen 
         name="OwnerDashboard" 
         component={OwnerDashboard} 
-        options={{ 
-            headerShown: true, 
-            title: 'Admin Dashboard',
-            headerLeft: null 
-        }} 
+        options={{ headerShown: false }} 
       />
-
+      
       <Stack.Screen name="Booking" component={BookingScreen} options={{ headerShown: true }} />
       <Stack.Screen name="AddPet" component={AddPetScreen} options={{ headerShown: true }} />
-      <Stack.Screen name="PetList" component={PetListScreen} options={{ headerShown: true }} />
+      <Stack.Screen name="PetList" component={PetListScreen} options={{ headerShown: true, title: 'My Family' }} />
     </Stack.Navigator>
   );
 }
