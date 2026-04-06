@@ -32,7 +32,8 @@ export default function HomeScreen({ navigation }) {
     vaccinationStatus: ['Up to date', 'Pending', 'Not Vaccinated', 'Other'],
     isFriendly: ['Very Friendly', 'Shy', 'Aggressive', 'Other'],
     allergies: ['None', 'Grain-free', 'Skin Allergies', 'Other'],
-    afraidOf: ['None', 'Thunder', 'Other Dogs', 'Other']
+    gender: ['Male', 'Female', 'Unknown'],
+    species: ['Dog', 'Cat', 'Rabbit', 'Other']
   };
 
   const fetchData = async () => {
@@ -142,7 +143,7 @@ export default function HomeScreen({ navigation }) {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* --- REUSABLE MODAL FROM PETLIST --- */}
+      {/* --- MODAL WITH ALL 9 FIELDS --- */}
       <Modal visible={isModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <SafeAreaView style={styles.modalContent}>
@@ -154,8 +155,27 @@ export default function HomeScreen({ navigation }) {
               <DetailRow label="Name" value={selectedPet?.name} isEditing={isEditing} 
                 onChange={(val) => setSelectedPet({...selectedPet, name: val})} />
               
+              <DropdownRow 
+                label="Species" 
+                value={selectedPet?.species} 
+                isEditing={isEditing}
+                options={dropdownOptions.species}
+                onSelect={(val) => setSelectedPet({...selectedPet, species: val})} 
+              />
+
               <DetailRow label="Age" value={String(selectedPet?.age || '')} isEditing={isEditing} keyboardType="numeric"
                 onChange={(val) => setSelectedPet({...selectedPet, age: val})} />
+
+              <DetailRow label="Breed" value={selectedPet?.breed} isEditing={isEditing} 
+                onChange={(val) => setSelectedPet({...selectedPet, breed: val})} />
+
+              <DropdownRow 
+                label="Gender" 
+                value={selectedPet?.gender} 
+                isEditing={isEditing}
+                options={dropdownOptions.gender}
+                onSelect={(val) => setSelectedPet({...selectedPet, gender: val})} 
+              />
 
               <DropdownRow 
                 label="Vaccination" 
@@ -172,6 +192,9 @@ export default function HomeScreen({ navigation }) {
                 options={dropdownOptions.allergies}
                 onSelect={(val) => setSelectedPet({...selectedPet, allergies: val})} 
               />
+
+              <DetailRow label="Afraid of" value={selectedPet?.afraidOf} isEditing={isEditing} 
+                onChange={(val) => setSelectedPet({...selectedPet, afraidOf: val})} />
 
               <DropdownRow 
                 label="Friendly?" 
@@ -206,7 +229,7 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-// --- Sub-components (Kept the same UI) ---
+// --- Sub-components (Restored exact original design) ---
 const DropdownRow = ({ label, value, options, isEditing, onSelect }) => {
   const isStandard = options.includes(value);
   const showOtherInput = value === 'Other' || (!isStandard && value !== '' && value != null);

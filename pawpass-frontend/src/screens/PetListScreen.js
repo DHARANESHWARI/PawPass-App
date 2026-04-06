@@ -13,12 +13,10 @@ export default function PetListScreen({ route }) {
   const [isEditing, setIsEditing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Options matching AddPetScreen requirements
   const dropdownOptions = {
     gender: ['Male', 'Female'],
     vaccinationStatus: ['Up to date', 'Pending', 'Not Vaccinated'],
-    isFriendly: ['Yes', 'No', 'Partially'],
-    allergies: ['None', 'Grain-free', 'Skin Allergies', 'Other'],
+    isFriendly: ['Yes', 'No', 'Shy', 'Partially'],
   };
 
   const fetchPets = async () => {
@@ -26,17 +24,24 @@ export default function PetListScreen({ route }) {
       const res = await apiClient.get('/pets');
       setPets(res.data);
 
+      // CRITICAL: Check if we need to auto-open a pet from Home Screen
       const autoOpenId = route.params?.autoOpenId;
       if (autoOpenId) {
         const petToOpen = res.data.find(p => p._id === autoOpenId);
-        if (petToOpen) handleOpenDetails(petToOpen);
+        if (petToOpen) {
+          setSelectedPet({ ...petToOpen });
+          setIsModalVisible(true);
+        }
       }
     } catch (err) {
       console.error("Error fetching pets:", err);
     }
   };
 
-  useEffect(() => { fetchPets(); }, [route.params?.autoOpenId]);
+  // Re-run fetch when the screen is focused or autoOpenId changes
+  useEffect(() => {
+    fetchPets();
+  }, [route.params?.autoOpenId]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -45,6 +50,7 @@ export default function PetListScreen({ route }) {
 
   const handleOpenDetails = (pet) => {
     setSelectedPet({ ...pet });
+    setIsEditing(false);
     setIsModalVisible(true);
   };
 
@@ -65,15 +71,15 @@ export default function PetListScreen({ route }) {
   };
 
   const renderPetItem = ({ item }) => (
-    <View style={styles.petCard}>
+    <TouchableOpacity style={styles.petCard} onPress={() => handleOpenDetails(item)}>
       <View style={{ flex: 1 }}>
         <Text style={styles.petName}>{item.name}</Text>
-        <Text style={styles.petSub}>{item.species} • {item.breed} • {item.gender}</Text>
+        <Text style={styles.petSub}>{item.species} • {item.breed}</Text>
       </View>
-      <TouchableOpacity style={styles.detailsBtn} onPress={() => handleOpenDetails(item)}>
+      <View style={styles.detailsBtn}>
         <Text style={styles.detailsBtnText}>Details</Text>
-      </TouchableOpacity>
-    </View>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -90,15 +96,31 @@ export default function PetListScreen({ route }) {
         <View style={styles.modalOverlay}>
           <SafeAreaView style={styles.modalContent}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>{isEditing ? "Edit Pet Profile" : selectedPet?.name}</Text>
+              <Text style={styles.modalTitle}>
+                {isEditing ? "Edit Profile" : `${selectedPet?.name}'s Profile`}
+              </Text>
               
+              {/* 1. Name */}
               <DetailRow label="Name" value={selectedPet?.name} isEditing={isEditing} 
                 onChange={(val) => setSelectedPet({...selectedPet, name: val})} />
-              
+
+              {/* 2 & 3. Species & Age */}
               <View style={styles.row}>
                 <View style={{ flex: 1, marginRight: 10 }}>
+                  <DetailRow label="Species" value={selectedPet?.species} isEditing={isEditing} 
+                    onChange={(val) => setSelectedPet({...selectedPet, species: val})} />
+                </View>
+                <View style={{ flex: 1 }}>
                   <DetailRow label="Age" value={String(selectedPet?.age || '')} isEditing={isEditing} keyboardType="numeric"
                     onChange={(val) => setSelectedPet({...selectedPet, age: val})} />
+                </View>
+              </View>
+
+              {/* 4 & 5. Breed & Gender */}
+              <View style={styles.row}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <DetailRow label="Breed" value={selectedPet?.breed} isEditing={isEditing} 
+                    onChange={(val) => setSelectedPet({...selectedPet, breed: val})} />
                 </View>
                 <View style={{ flex: 1 }}>
                    <DropdownRow label="Gender" value={selectedPet?.gender} isEditing={isEditing}
@@ -106,28 +128,33 @@ export default function PetListScreen({ route }) {
                 </View>
               </View>
 
-              <DetailRow label="Breed" value={selectedPet?.breed} isEditing={isEditing} 
-                onChange={(val) => setSelectedPet({...selectedPet, breed: val})} />
-
               <Text style={styles.sectionHeader}>Medical & Behavior</Text>
 
-              <DropdownRow label="Vaccination" value={selectedPet?.vaccinationStatus} isEditing={isEditing}
+              {/* 6. Vaccination Status (Note the key matches AddPetScreen) */}
+              <DropdownRow label="Vaccination Status" value={selectedPet?.vaccinationStatus} isEditing={isEditing}
                 options={dropdownOptions.vaccinationStatus} onSelect={(val) => setSelectedPet({...selectedPet, vaccinationStatus: val})} />
 
+              {/* 7. Allergies */}
               <DetailRow label="Allergies" value={selectedPet?.allergies} isEditing={isEditing} 
                 onChange={(val) => setSelectedPet({...selectedPet, allergies: val})} />
 
+              {/* 8. Afraid Of */}
               <DetailRow label="Afraid of" value={selectedPet?.afraidOf} isEditing={isEditing} 
                 onChange={(val) => setSelectedPet({...selectedPet, afraidOf: val})} />
 
-              <DropdownRow label="Friendly Status" value={selectedPet?.isFriendly} isEditing={isEditing}
+              {/* 9. Friendly Status */}
+              <DropdownRow label="Is Friendly?" value={selectedPet?.isFriendly} isEditing={isEditing}
                 options={dropdownOptions.isFriendly} onSelect={(val) => setSelectedPet({...selectedPet, isFriendly: val})} />
 
               <View style={styles.modalButtons}>
                 {isEditing ? (
-                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}><Text style={styles.btnText}>Save Changes</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEdit}>
+                    <Text style={styles.btnText}>Save Changes</Text>
+                  </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(true)}><Text style={styles.btnText}>Edit Profile</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.editBtn} onPress={() => setIsEditing(true)}>
+                    <Text style={styles.btnText}>Edit Profile</Text>
+                  </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.closeBtn} onPress={() => { setIsModalVisible(false); setIsEditing(false); }}>
                   <Text style={styles.closeBtnText}>Close</Text>
@@ -173,7 +200,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25, maxHeight: '90%' },
   modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#4CAF50', textAlign: 'center', marginBottom: 20 },
-  sectionHeader: { fontSize: 16, fontWeight: 'bold', color: '#444', marginTop: 10, marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 5 },
+  sectionHeader: { fontSize: 16, fontWeight: 'bold', color: '#444', marginTop: 15, marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 5 },
   detailRow: { marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', paddingBottom: 10 },
   detailLabel: { fontSize: 12, color: '#888', fontWeight: 'bold' },
   detailValue: { fontSize: 16, marginTop: 4, color: '#333' },

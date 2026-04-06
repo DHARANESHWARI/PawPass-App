@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, 
   Alert, ActivityIndicator, ScrollView, Platform 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import apiClient from '../api/client';
@@ -18,24 +19,11 @@ const BookingScreen = ({ route, navigation }) => {
   const [selectedTime, setSelectedTime] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Expanded Services List
   const servicesMap = {
-    'Vet Visit': [
-      'General Checkup', 'Vaccination', 'Dental Cleaning', 
-      'Emergency/Injury', 'Skin/Allergy Consultation', 'Deworming'
-    ],
-    'Sitter': [
-      'Day Care (8hrs)', 'Overnight Boarding', 'Dog Walking (30 min)', 
-      'Dog Walking (1 hr)', 'House Sitting', 'Drop-in Visit'
-    ],
-    'Groomer': [
-      'Full Grooming', 'Bath & Brush', 'Nail Trimming', 
-      'Ear Cleaning', 'Puppy\'s First Groom', 'De-Shedding Treatment'
-    ],
-    'Trainer': [
-      'Puppy Socialization', 'Basic Obedience', 'Leash Training', 
-      'Aggression Management', 'Potty Training', 'Agility Training'
-    ]
+    'Vet Visit': ['General Checkup', 'Vaccination', 'Dental Cleaning', 'Emergency/Injury', 'Skin/Allergy Consultation', 'Deworming'],
+    'Sitter': ['Day Care (8hrs)', 'Overnight Boarding', 'Dog Walking (30 min)', 'Dog Walking (1 hr)', 'House Sitting', 'Drop-in Visit'],
+    'Groomer': ['Full Grooming', 'Bath & Brush', 'Nail Trimming', 'Ear Cleaning', 'Puppy\'s First Groom', 'De-Shedding Treatment'],
+    'Trainer': ['Puppy Socialization', 'Basic Obedience', 'Leash Training', 'Aggression Management', 'Potty Training', 'Agility Training']
   };
 
   const timeSlots = ['09:00 AM', '10:30 AM', '12:00 PM', '02:00 PM', '03:30 PM', '05:00 PM'];
@@ -62,10 +50,8 @@ const BookingScreen = ({ route, navigation }) => {
       });
       
       Alert.alert("Success! 🐾", "Appointment confirmed.");
-      // Navigates back to the Home tab inside the MainApp stack
       navigation.navigate('MainApp', { screen: 'Home' }); 
     } catch (err) {
-      console.log("Booking Post Error:", err.response?.data);
       Alert.alert("Booking Failed", "Check your internet or server connection.");
     } finally {
       setLoading(false);
@@ -73,82 +59,83 @@ const BookingScreen = ({ route, navigation }) => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.header}>Book {mainService}</Text>
-      
-      {/* 1. Pet Selection */}
-      <Text style={styles.label}>Select Your Pet</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={selectedPetId} onValueChange={setSelectedPetId}>
-          {pets.length > 0 ? pets.map(p => (
-            <Picker.Item key={p._id} label={p.name} value={p._id} />
-          )) : <Picker.Item label="No pets found" value={null} />}
-        </Picker>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Top Spacer to move content down */}
+        <View style={{ height: 30 }} />
 
-      {/* 2. Sub-Service Selection */}
-      <Text style={styles.label}>Select Specific Service</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={subService} onValueChange={setSubService}>
-          <Picker.Item label="Choose service..." value="" />
-          {servicesMap[mainService].map(s => (
-            <Picker.Item key={s} label={s} value={s} />
+        <Text style={styles.header}>Book {mainService}</Text>
+        
+        <Text style={styles.label}>Select Your Pet</Text>
+        <View style={styles.pickerContainer}>
+          <Picker selectedValue={selectedPetId} onValueChange={setSelectedPetId}>
+            {pets.length > 0 ? pets.map(p => (
+              <Picker.Item key={p._id} label={p.name} value={p._id} />
+            )) : <Picker.Item label="No pets found" value={null} />}
+          </Picker>
+        </View>
+
+        <Text style={styles.label}>Select Specific Service</Text>
+        <View style={styles.pickerContainer}>
+          <Picker selectedValue={subService} onValueChange={setSubService}>
+            <Picker.Item label="Choose service..." value="" />
+            {servicesMap[mainService].map(s => (
+              <Picker.Item key={s} label={s} value={s} />
+            ))}
+          </Picker>
+        </View>
+
+        <Text style={styles.label}>Select Date</Text>
+        <TouchableOpacity style={styles.inputBtn} onPress={() => setShowCalendar(true)}>
+          <Text style={styles.inputText}>📅 {date.toDateString()}</Text>
+        </TouchableOpacity>
+        
+        {showCalendar && (
+          <DateTimePicker 
+            value={date} 
+            mode="date" 
+            minimumDate={new Date()}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={(event, selectedDate) => {
+              setShowCalendar(false);
+              if (selectedDate) setDate(selectedDate);
+            }} 
+          />
+        )}
+
+        <Text style={styles.label}>Select Time Slot</Text>
+        <View style={styles.timeGrid}>
+          {timeSlots.map(slot => (
+            <TouchableOpacity 
+              key={slot} 
+              style={[styles.timeChip, selectedTime === slot && styles.timeChipActive]}
+              onPress={() => setSelectedTime(slot)}
+            >
+              <Text style={[styles.timeText, selectedTime === slot && styles.timeTextActive]}>
+                {slot}
+              </Text>
+            </TouchableOpacity>
           ))}
-        </Picker>
-      </View>
+        </View>
 
-      {/* 3. Date Selection */}
-      <Text style={styles.label}>Select Date</Text>
-      <TouchableOpacity style={styles.inputBtn} onPress={() => setShowCalendar(true)}>
-        <Text style={styles.inputText}>📅 {date.toDateString()}</Text>
-      </TouchableOpacity>
-      
-      {showCalendar && (
-        <DateTimePicker 
-          value={date} 
-          mode="date" 
-          minimumDate={new Date()}
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, selectedDate) => {
-            setShowCalendar(false);
-            if (selectedDate) setDate(selectedDate);
-          }} 
-        />
-      )}
+        <TouchableOpacity 
+          style={[styles.bookBtn, loading && { opacity: 0.7 }]} 
+          onPress={handleBook}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.bookBtnText}>Confirm Booking</Text>}
+        </TouchableOpacity>
 
-      {/* 4. Time Selection */}
-      <Text style={styles.label}>Select Time Slot</Text>
-      <View style={styles.timeGrid}>
-        {timeSlots.map(slot => (
-          <TouchableOpacity 
-            key={slot} 
-            style={[styles.timeChip, selectedTime === slot && styles.timeChipActive]}
-            onPress={() => setSelectedTime(slot)}
-          >
-            <Text style={[styles.timeText, selectedTime === slot && styles.timeTextActive]}>
-              {slot}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Submit Button */}
-      <TouchableOpacity 
-        style={[styles.bookBtn, loading && { opacity: 0.7 }]} 
-        onPress={handleBook}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.bookBtnText}>Confirm Booking</Text>}
-      </TouchableOpacity>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+        <View style={{ height: 60 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 20 },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#4CAF50', marginBottom: 20 },
+  safeArea: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, paddingHorizontal: 20 },
+  header: { fontSize: 28, fontWeight: 'bold', color: '#4CAF50', marginBottom: 10 },
   label: { fontSize: 16, fontWeight: '600', color: '#333', marginTop: 15, marginBottom: 8 },
   pickerContainer: { backgroundColor: '#F5F7FA', borderRadius: 12, borderWidth: 1, borderColor: '#E0E4E8', overflow: 'hidden' },
   inputBtn: { padding: 15, backgroundColor: '#F5F7FA', borderRadius: 12, borderWidth: 1, borderColor: '#E0E4E8' },
@@ -163,4 +150,3 @@ const styles = StyleSheet.create({
 });
 
 export default BookingScreen;
-
