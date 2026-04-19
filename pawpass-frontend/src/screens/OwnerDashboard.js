@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, 
-  RefreshControl, ScrollView, Alert, Modal 
+  RefreshControl, ScrollView, Alert, Modal, Dimensions
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,34 +9,38 @@ import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const { width } = Dimensions.get('window');
+
 const OwnerDashboard = ({ navigation }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Queue');
   const [showCalendar, setShowCalendar] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
-  
-  // States for Pet Modal
   const [selectedPet, setSelectedPet] = useState(null);
   const [showPetModal, setShowPetModal] = useState(false);
 
-  // --- ANALYTICS ---
+  // --- ANALYTICS ENGINE ---
   const analytics = useMemo(() => {
     if (!data || !data.bookings) return { revenue: 0, topService: 'N/A', completed: 0, total: 0, cancelled: 0, serviceBreakdown: {} };
     const bookings = data.bookings;
     const validBookings = bookings.filter(b => b.status !== 'Cancelled');
     const estRevenue = validBookings.length * 50; 
     const serviceCounts = {};
+    
     bookings.forEach(b => {
       const s = b.service?.split(':')[0].trim() || "Service"; 
       serviceCounts[s] = (serviceCounts[s] || 0) + 1;
     });
+
     const topService = Object.keys(serviceCounts).length > 0 
       ? Object.keys(serviceCounts).reduce((a, b) => serviceCounts[a] > serviceCounts[b] ? a : b) 
       : 'None';
+    
     const completed = bookings.filter(b => b.status === 'Completed').length;
     const cancelled = bookings.filter(b => b.status === 'Cancelled').length;
     const total = bookings.length;
+
     return { 
       revenue: estRevenue, topService, completed, total, cancelled, serviceBreakdown: serviceCounts,
       completionRate: (total - cancelled) > 0 ? Math.round((completed / (total - cancelled)) * 100) : 0
@@ -113,25 +117,38 @@ const OwnerDashboard = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       
-      {/* SERVICE BREAKDOWN MODAL */}
-      <Modal visible={showServiceModal} transparent animationType="fade">
+      {/* IMPROVED SERVICE BREAKDOWN MODAL */}
+      <Modal visible={showServiceModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Daily Service Mix</Text>
-            {Object.entries(analytics.serviceBreakdown).map(([name, count]) => (
-              <View key={name} style={styles.modalRow}>
-                <Text style={styles.modalText}>{name}</Text>
-                <Text style={styles.modalCount}>{count} Booked</Text>
-              </View>
-            ))}
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowServiceModal(false)}>
-              <Text style={styles.closeBtnText}>Close</Text>
+          <View style={[styles.modalContent, { width: '85%' }]}>
+            <View style={styles.modalHeaderRow}>
+               <Ionicons name="flame" size={24} color="#FF5722" />
+               <Text style={styles.modalTitle}>Daily Service Mix</Text>
+            </View>
+            
+            <View style={styles.modalScrollArea}>
+              {Object.entries(analytics.serviceBreakdown).length > 0 ? (
+                Object.entries(analytics.serviceBreakdown).map(([name, count]) => (
+                  <View key={name} style={styles.serviceItemRow}>
+                    <Text style={styles.serviceItemName}>{name}</Text>
+                    <View style={styles.countPill}>
+                       <Text style={styles.countPillText}>{count} Booked</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>No bookings for this date.</Text>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.closeBtnPrimary} onPress={() => setShowServiceModal(false)}>
+              <Text style={styles.closeBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* PET DETAILS MODAL (FIXED GENDER FIELD) */}
+      {/* PET DETAILS MODAL */}
       <Modal visible={showPetModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { width: '92%', maxHeight: '85%' }]}>
@@ -148,13 +165,12 @@ const OwnerDashboard = ({ navigation }) => {
                   { label: 'Species', val: selectedPet?.species, icon: 'paw' },
                   { label: 'Breed', val: selectedPet?.breed, icon: 'git-branch' },
                   { label: 'Age (Years)', val: selectedPet?.age, icon: 'calendar' },
-                  // FIXED: Fallback to gender or sex depending on your backend schema
-                  { label: 'Gender', val: selectedPet?.gender || selectedPet?.sex, icon: 'male-female' },
+                  { label: 'Gender', val: selectedPet?.gender || 'Not Provided', icon: 'male-female' },
                 ].map((item, i) => (
                   <View key={i} style={styles.gridItem}>
                     <Ionicons name={item.icon} size={14} color="#4CAF50" style={{marginBottom: 4}} />
                     <Text style={styles.detailLabel}>{item.label}</Text>
-                    <Text style={styles.detailVal}>{item.val || 'Unspecified'}</Text>
+                    <Text style={styles.detailVal}>{item.val}</Text>
                   </View>
                 ))}
               </View>
@@ -163,38 +179,45 @@ const OwnerDashboard = ({ navigation }) => {
               <Text style={styles.sectionLabel}>Medical & Behavior</Text>
 
               {[
-                { label: 'Vaccination Status', val: selectedPet?.vaccinationStatus, icon: 'medkit' },
+                { label: 'Vaccination', val: selectedPet?.vaccinationStatus, icon: 'medkit' },
                 { label: 'Allergies', val: selectedPet?.allergies, icon: 'alert-circle' },
-                { label: 'Afraid of (e.g. Thunder)', val: selectedPet?.fears || selectedPet?.afraidOf, icon: 'thunderstorm' },
-                { label: 'Is Friendly?', val: selectedPet?.isFriendly ? "Yes" : "No", icon: 'happy' },
+                { label: 'Fears', val: selectedPet?.afraidOf, icon: 'thunderstorm' },
+                { label: 'Friendly', val: selectedPet?.isFriendly, icon: 'happy' },
               ].map((item, i) => (
                 <View key={i} style={styles.listDetailItem}>
                   <View style={styles.listIconCircle}><Ionicons name={item.icon} size={18} color="#4CAF50" /></View>
                   <View style={{flex:1}}>
                     <Text style={styles.detailLabel}>{item.label}</Text>
-                    <Text style={[styles.detailVal, {fontSize: 15}]}>{item.val || 'None listed'}</Text>
+                    <Text style={[styles.detailVal, {fontSize: 15}]}>{item.val || 'None'}</Text>
                   </View>
                 </View>
               ))}
             </ScrollView>
 
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowPetModal(false)}>
+            <TouchableOpacity style={styles.closeBtnPrimary} onPress={() => setShowPetModal(false)}>
               <Text style={styles.closeBtnText}>Return to Dashboard</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
+      {/* HEADER */}
       <View style={styles.titleBar}>
-        <Text style={styles.adminTitle}>Owner Command</Text>
+        <View>
+          <Text style={styles.greetingText}>Welcome Back,</Text>
+          <Text style={styles.adminTitle}>Owner Command</Text>
+        </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#FF5252" />
+          <Ionicons name="log-out-outline" size={22} color="#FF5252" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboard} />}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDashboard} />}
+      >
         
-        {/* ANALYTICS */}
+        {/* ANALYTICS SECTION */}
         <View style={styles.analyticsSection}>
           <View style={styles.revenueCard}>
             <Text style={styles.anaLabel}>ESTIMATED REVENUE</Text>
@@ -207,17 +230,19 @@ const OwnerDashboard = ({ navigation }) => {
 
           <View style={styles.miniStatsRow}>
             <TouchableOpacity style={styles.miniStat} onPress={() => setShowServiceModal(true)}>
-               <Ionicons name="flame" size={18} color="#FF5722" />
+               <View style={styles.statHeader}>
+                 <Ionicons name="flame" size={16} color="#FF5722" />
+                 <Text style={styles.miniStatLab}>HOT SERVICE</Text>
+               </View>
                <Text style={styles.miniStatVal} numberOfLines={1}>{analytics.topService}</Text>
-               <Text style={styles.miniStatLab}>HOT SERVICE</Text>
             </TouchableOpacity>
             
             <View style={styles.miniStat}>
-               <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+               <View style={styles.statHeader}>
+                 <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                 <Text style={styles.miniStatLab}>COMPLETED</Text>
+               </View>
                <Text style={styles.miniStatVal}>{analytics.completed} / {analytics.total}</Text>
-               <Text style={[styles.miniStatLab, analytics.cancelled > 0 && {color: '#FF5252'}]}>
-                 {analytics.cancelled > 0 ? `${analytics.cancelled} REJECTED` : 'COMPLETED'}
-               </Text>
             </View>
           </View>
         </View>
@@ -227,7 +252,7 @@ const OwnerDashboard = ({ navigation }) => {
           <TouchableOpacity onPress={() => setShowCalendar(!showCalendar)} style={styles.datePickerToggle}>
             <Ionicons name="calendar" size={18} color="#4CAF50" style={{marginRight: 8}} />
             <Text style={styles.selectedDateText}>{selectedDate}</Text>
-            <Text style={styles.chevron}> ▼</Text>
+            <Ionicons name={showCalendar ? "chevron-up" : "chevron-down"} size={14} color="#4CAF50" style={{marginLeft: 8}} />
           </TouchableOpacity>
         </View>
 
@@ -251,7 +276,7 @@ const OwnerDashboard = ({ navigation }) => {
 
         {/* BOOKING LIST */}
         <View style={styles.listSection}>
-          {getDisplayList().map(item => {
+          {getDisplayList().length > 0 ? getDisplayList().map(item => {
             const isRejected = item.status === 'Cancelled';
             return (
               <View key={item._id} style={styles.bookingCard}>
@@ -259,8 +284,8 @@ const OwnerDashboard = ({ navigation }) => {
                   <View style={styles.infoWrapper}>
                     <TouchableOpacity onPress={() => openPetDetails(item.pet)}>
                       <Text style={styles.petName}>
-                        {isRejected ? '❌ ' : '🐾 '}{item.pet?.name}
-                        <Text style={{fontSize: 10, color: '#4CAF50', fontWeight: 'normal'}}> (Review)</Text>
+                        {isRejected ? '❌ ' : '🐾 '}{item.pet?.name || 'Unknown Pet'}
+                        <Text style={styles.reviewLink}> (Review)</Text>
                       </Text>
                     </TouchableOpacity>
                     <Text style={styles.serviceText}>{item.service} • {item.time}</Text>
@@ -283,7 +308,12 @@ const OwnerDashboard = ({ navigation }) => {
                 </View>
               </View>
             );
-          })}
+          }) : (
+            <View style={styles.emptyContainer}>
+               <Ionicons name="documents-outline" size={50} color="#DDD" />
+               <Text style={styles.emptyText}>No bookings in this category.</Text>
+            </View>
+          )}
         </View>
         <View style={{height: 100}} />
       </ScrollView>
@@ -294,55 +324,70 @@ const OwnerDashboard = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFB' },
   titleBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#FFF' },
-  adminTitle: { fontSize: 22, fontWeight: 'bold', color: '#1A1A1A' },
+  greetingText: { fontSize: 12, color: '#888', fontWeight: '600' },
+  adminTitle: { fontSize: 20, fontWeight: 'bold', color: '#1A1A1A' },
   logoutBtn: { backgroundColor: '#FFF0F0', padding: 10, borderRadius: 12 },
-  analyticsSection: { padding: 20 },
-  revenueCard: { backgroundColor: '#1A1A1A', padding: 20, borderRadius: 24, elevation: 6 },
-  anaLabel: { color: '#888', fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
-  revenueVal: { color: '#FFF', fontSize: 36, fontWeight: 'bold', marginVertical: 4 },
+  analyticsSection: { paddingHorizontal: 20, paddingTop: 10 },
+  revenueCard: { backgroundColor: '#1A1A1A', padding: 22, borderRadius: 28, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5 },
+  anaLabel: { color: '#888', fontSize: 10, fontWeight: 'bold', letterSpacing: 1.5 },
+  revenueVal: { color: '#FFF', fontSize: 38, fontWeight: 'bold', marginVertical: 4 },
   progressBar: { height: 6, backgroundColor: '#4CAF50', borderRadius: 3 },
-  progressRow: { height: 6, width: '100%', backgroundColor: '#333', borderRadius: 3, marginTop: 10 },
-  progressText: { color: '#888', fontSize: 11, marginTop: 8 },
+  progressRow: { height: 6, width: '100%', backgroundColor: '#333', borderRadius: 3, marginTop: 12 },
+  progressText: { color: '#888', fontSize: 11, marginTop: 10 },
   miniStatsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 },
-  miniStat: { backgroundColor: '#FFF', width: '48%', padding: 16, borderRadius: 20, elevation: 2, alignItems: 'center' },
-  miniStatVal: { fontSize: 18, fontWeight: 'bold', color: '#1A1A1A', marginTop: 4 },
-  miniStatLab: { fontSize: 9, color: '#AAA', fontWeight: 'bold', marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#FFF', borderRadius: 24, padding: 25, elevation: 15 },
+  miniStat: { backgroundColor: '#FFF', width: '48%', padding: 16, borderRadius: 24, elevation: 3, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
+  statHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  miniStatVal: { fontSize: 16, fontWeight: 'bold', color: '#1A1A1A' },
+  miniStatLab: { fontSize: 9, color: '#999', fontWeight: '800', marginLeft: 6 },
+  
+  // MODAL STYLES (HOT SERVICES)
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#FFF', borderRadius: 30, padding: 25, elevation: 20 },
+  modalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, borderBottomWidth: 1, borderBottomColor: '#F0F0F0', paddingBottom: 15 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#1A1A1A', marginLeft: 10 },
+  modalScrollArea: { marginVertical: 10 },
+  serviceItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 15, borderRadius: 16, marginBottom: 10 },
+  serviceItemName: { fontSize: 15, fontWeight: '600', color: '#333', flex: 1 },
+  countPill: { backgroundColor: '#E8F5E9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  countPillText: { color: '#4CAF50', fontWeight: 'bold', fontSize: 12 },
+  closeBtnPrimary: { backgroundColor: '#1A1A1A', marginTop: 20, padding: 18, borderRadius: 18, alignItems: 'center' },
+  closeBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+
+  // PET MODAL
   petModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   detailGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridItem: { width: '48%', backgroundColor: '#F9F9F9', padding: 12, borderRadius: 15, marginBottom: 12 },
-  sectionDivider: { height: 1, backgroundColor: '#EEE', marginVertical: 15 },
-  sectionLabel: { fontSize: 14, fontWeight: 'bold', color: '#888', marginBottom: 15, textTransform: 'uppercase' },
-  listDetailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  listIconCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(76, 175, 80, 0.1)', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  detailLabel: { fontSize: 10, color: '#999', fontWeight: 'bold', textTransform: 'uppercase' },
+  gridItem: { width: '48%', backgroundColor: '#F9FAFB', padding: 14, borderRadius: 18, marginBottom: 12 },
+  sectionDivider: { height: 1, backgroundColor: '#F0F0F0', marginVertical: 15 },
+  sectionLabel: { fontSize: 13, fontWeight: '800', color: '#AAA', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
+  listDetailItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  listIconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(76, 175, 80, 0.08)', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  detailLabel: { fontSize: 9, color: '#AAA', fontWeight: '800', textTransform: 'uppercase', marginBottom: 2 },
   detailVal: { fontSize: 14, color: '#1A1A1A', fontWeight: '700' },
-  closeBtn: { backgroundColor: '#1A1A1A', marginTop: 10, padding: 16, borderRadius: 14, alignItems: 'center' },
-  closeBtnText: { color: '#FFF', fontWeight: 'bold' },
-  dateSection: { paddingHorizontal: 20, paddingVertical: 10 },
-  datePickerToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 12, borderRadius: 12, alignSelf: 'flex-start', elevation: 1 },
-  selectedDateText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  chevron: { fontSize: 10, color: '#4CAF50' },
-  calendarPopout: { backgroundColor: '#FFF', margin: 10, borderRadius: 15, elevation: 5, overflow: 'hidden' },
-  tabs: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 15 },
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#EEE' },
+  
+  dateSection: { paddingHorizontal: 20, paddingVertical: 15 },
+  datePickerToggle: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, alignSelf: 'flex-start', elevation: 2 },
+  selectedDateText: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
+  calendarPopout: { backgroundColor: '#FFF', marginHorizontal: 20, borderRadius: 20, elevation: 10, overflow: 'hidden', marginBottom: 15 },
+  tabs: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20 },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 3, borderBottomColor: '#F0F0F0' },
   tabBtnActive: { borderBottomColor: '#4CAF50' },
-  tabText: { color: '#AAA', fontWeight: 'bold' },
+  tabText: { color: '#BBB', fontWeight: '700', fontSize: 13 },
   tabTextActive: { color: '#4CAF50' },
   listSection: { paddingHorizontal: 20 },
-  bookingCard: { backgroundColor: '#FFF', padding: 18, borderRadius: 20, marginBottom: 15, elevation: 2 },
+  bookingCard: { backgroundColor: '#FFF', padding: 20, borderRadius: 26, marginBottom: 16, elevation: 4, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 10 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   infoWrapper: { flex: 1, marginRight: 12 },
-  statusBadge: { backgroundColor: '#F0F9F4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  petName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  serviceText: { color: '#777', fontSize: 13, marginTop: 4 },
-  statusText: { color: '#4CAF50', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
-  cardFooter: { marginTop: 15, borderTopWidth: 1, borderTopColor: '#F5F5F5', paddingTop: 15 },
+  statusBadge: { backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, height: 26 },
+  petName: { fontSize: 19, fontWeight: '800', color: '#1A1A1A' },
+  reviewLink: { fontSize: 11, color: '#4CAF50', fontWeight: '500' },
+  serviceText: { color: '#888', fontSize: 13, marginTop: 5, fontWeight: '500' },
+  statusText: { color: '#22C55E', fontSize: 10, fontWeight: '900', textTransform: 'uppercase' },
+  cardFooter: { marginTop: 18, borderTopWidth: 1, borderTopColor: '#F9FAFB', paddingTop: 18 },
   buttonGroup: { flexDirection: 'row' },
-  actionBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
-  btnTxt: { color: '#FFF', fontWeight: 'bold' }
+  actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center' },
+  btnTxt: { color: '#FFF', fontWeight: 'bold', fontSize: 15 },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { color: '#AAA', marginTop: 10, fontWeight: '600' }
 });
 
 export default OwnerDashboard;
